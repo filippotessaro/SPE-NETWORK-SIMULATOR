@@ -1,0 +1,12 @@
+.ropeproject
+*.pyc
+*.csv
+.idea/
+*.RData
+trivial-normal/
+trivial-realistic/
+aloha-realistic/
+aloha-normal/
+plot/
+.Rhistory
+*.pdf
