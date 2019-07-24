@@ -30,8 +30,11 @@ for i in {0..30}; do python3 main.py -r $i; done;
 
 #-------------- R Script for Plotting ----------------
 git checkout plot;
-echo Rscript;
-RScript plotting.r ;
+echo plotting-normal;
+RScript plotting-normal.r ;
 
-echo "Rscript-trivial";
+echo plotting-realistic;
+RScript plotting-realistic.r ;
+
+echo "Rscript-trivial carrier sensing normal";
 RScript process.r ;

@@ -8,7 +8,7 @@ registerDoMC(cores=detectCores())
 folders <- c('./aloha-normal','./trivial-normal')
 
 # Plotting Folder
-res.folder = "./plot"
+res.folder = "./plot-normal"
 mainDir = "./"
 
 # check if there is the data folders
