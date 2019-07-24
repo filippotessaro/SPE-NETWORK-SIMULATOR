@@ -17,6 +17,8 @@ import random
 import sys
 import math
 
+import numpy
+
 
 class Distribution:
     """
@@ -42,6 +44,8 @@ class Distribution:
     UNIFORM = "unif"
     # exponential random variable
     EXPONENTIAL = "exp"
+    # bernoulli distribution
+    BERNOULLI = "bernoulli"
 
     def __init__(self, config):
         """
@@ -49,6 +53,7 @@ class Distribution:
         :param config: an object used for configuring the distribution in the
         format {"distribution":NAME,"par1":value[,"par2":value,...]}.
         Accepted values so far are:
+        {"distribution" : "bernoulli", "mean" : value}, exponential random variable
         {"distribution" : "const", "mean" : value}, constant variable
         {"distribution" : "exp", "mean" : value}, exponential random variable
         with mean being 1/lambda. "lambda" : value can also be used
@@ -57,7 +62,9 @@ class Distribution:
         """
         try:
             # find the correct distribution depending on the specified name
-            if config[Distribution.DISTRIBUTION] == Distribution.CONSTANT:
+            if config[Distribution.DISTRIBUTION] == Distribution.BERNOULLI:
+                self.d = Bernoulli(config[Distribution.MEAN])
+            elif config[Distribution.DISTRIBUTION] == Distribution.CONSTANT:
                 self.d = Const(config[Distribution.MEAN])
             elif config[Distribution.DISTRIBUTION] == Distribution.UNIFORM:
                 integer = False
@@ -152,3 +159,15 @@ class Exp:
             return math.ceil(random.expovariate(self.l))
         else:
             return random.expovariate(self.l)
+
+
+class Bernoulli:
+    """
+    bernoulli class
+    """
+    def __init__(self, mean):
+        self.mean = mean
+
+    def get_value(self):
+        value = numpy.random.binomial(1, self.mean)
+        return value

@@ -15,7 +15,7 @@
 
 import sys
 from module import Module
-from distribution import Distribution
+from distribution import Distribution,Uniform
 from event import Event
 from events import Events
 from packet import Packet
@@ -157,36 +157,43 @@ class Node(Module):
         """
         new_packet = event.get_obj()
         if self.state == Node.IDLE:
-            if self.receiving_count == 0:
-                # node is idle: it will try to receive this packet
-                assert(self.current_pkt is None)
-                new_packet.set_state(Packet.PKT_RECEIVING)
-                self.current_pkt = new_packet
-                self.state = Node.RX
-                assert(self.timeout_event is None)
-                # create and schedule the RX timeout
-                self.timeout_event = Event(self.sim.get_time() +
-                                           self.timeout_time, Events.RX_TIMEOUT,
-                                           self, self, None)
-                self.sim.schedule_event(self.timeout_event)
-                self.logger.log_state(self, Node.RX)
+            # reception is successful based on probabilistic model
+            mean = new_packet.getprobcorrect()
+            p = Distribution({"distribution": "bernoulli", "mean": mean})
+            if p.get_value() == 1:
+                if self.receiving_count == 0:
+                    # node is idle: it will try to receive this packet
+                    assert (self.current_pkt is None)
+                    new_packet.set_state(Packet.PKT_RECEIVING)
+                    self.current_pkt = new_packet
+                    self.state = Node.RX
+                    assert (self.timeout_event is None)
+                    # create and schedule the RX timeout
+                    self.timeout_event = Event(self.sim.get_time() +
+                                               self.timeout_time, Events.RX_TIMEOUT,
+                                               self, self, None)
+                    self.sim.schedule_event(self.timeout_event)
+                    self.logger.log_state(self, Node.RX)
+                else:
+                    # there is another signal in the air but we are IDLE. this
+                    # happens if we start receiving a frame while transmitting
+                    # another. when we are done with the transmission we assume we
+                    # are not able to detect that there is another frame in the air
+                    # (we are not doing carrier sensing). In this case we assume we
+                    # are not able to detect the new one and set that to corrupted
+                    new_packet.set_state(Packet.PKT_CORRUPTED_BY_CHANNEL)
             else:
-                # there is another signal in the air but we are IDLE. this
-                # happens if we start receiving a frame while transmitting
-                # another. when we are done with the transmission we assume we
-                # are not able to detect that there is another frame in the air
-                # (we are not doing carrier sensing). In this case we assume we
-                # are not able to detect the new one and set that to corrupted
+                # packet corrupted
                 new_packet.set_state(Packet.PKT_CORRUPTED)
         else:
             # node is either receiving or transmitting
             if self.state == Node.RX and self.current_pkt is not None:
                 # the frame we are currently receiving is corrupted by a
                 # collision, if we have one
-                self.current_pkt.set_state(Packet.PKT_CORRUPTED)
+                self.current_pkt.set_state(Packet.PKT_CORRUPTED_BY_CHANNEL)
             # the same holds for the new incoming packet. either if we are in
             # the RX, TX, or PROC state, we won't be able to decode it
-            new_packet.set_state(Packet.PKT_CORRUPTED)
+            new_packet.set_state(Packet.PKT_CORRUPTED_BY_CHANNEL)
         # in any case, we schedule a new event to handle the end of this frame
         end_rx = Event(self.sim.get_time() + new_packet.get_duration(),
                        Events.END_RX, self, self, new_packet)
@@ -203,8 +210,8 @@ class Node(Module):
         # if the packet that ends is the one that we are trying to receive, but
         # we are not in the RX state, then something is very wrong
         if self.current_pkt is not None and \
-           packet.get_id() == self.current_pkt.get_id():
-            assert(self.state == Node.RX)
+                packet.get_id() == self.current_pkt.get_id():
+            assert (self.state == Node.RX)
         if self.state == Node.RX:
             if packet.get_state() == Packet.PKT_RECEIVING:
                 # the packet is not in a corrupted state: we succesfully
@@ -212,14 +219,14 @@ class Node(Module):
                 packet.set_state(Packet.PKT_RECEIVED)
                 # just to be sure: we can only correctly receive the packet we
                 # were trying to decode
-                assert(packet.get_id() == self.current_pkt.get_id())
+                assert (packet.get_id() == self.current_pkt.get_id())
             # we might be in RX state but have no current packet. this can
             # happen when a packet overlaps with the current one being received
             # and the one being received terminates earlier. we assume to stay
             # in the RX state because we are not able to detect the end of the
             # frame
             if self.current_pkt is not None and \
-               packet.get_id() == self.current_pkt.get_id():
+                    packet.get_id() == self.current_pkt.get_id():
                 self.current_pkt = None
             if self.receiving_count == 1:
                 # this is the only frame currently in the air, move to PROC

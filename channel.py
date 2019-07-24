@@ -95,9 +95,21 @@ class Channel(Module):
         :param packet: packet being transmitted
         """
         for neighbor in self.neighbors[source_node.get_id()]:
-            # compute propagation delay: distance / speed of light
-            propagation_delay = self.distance(source_node, neighbor) /\
-                                Channel.SOL
+
+            # distance from receiver
+            distance = self.distance(source_node, neighbor)
+
+            # probability of correct reception p(correct_reception|d)
+            # REALISTIC MODEL
+            prob_correct = 1 - (distance/self.range) ** (1/3)
+
+            # setting the prob to the packet
+            distance = self.distance(source_node, neighbor)
+            packet.setprobcorrect(prob_correct)
+
+            # fraction between distance and SOL
+            propagation_delay = distance / Channel.SOL
+
             # generate and schedule START_RX event at receiver
             # be sure to make a copy of the packet and not pass the same
             # reference to multiple nodes, as they will process the packet in

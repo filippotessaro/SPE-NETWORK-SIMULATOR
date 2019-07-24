@@ -34,6 +34,10 @@ class Log:
     LOG_QUEUE_SIZE = LOG_QUEUE_DROPPED + 1
     # use to log node state in time
     LOG_NODE_STATE = LOG_QUEUE_SIZE + 1
+    # use to log carrier sensing state
+    LOG_SENSING = LOG_NODE_STATE + 1
+    # log the realistic propagation case
+    LOG_CORRUPTED_BY_CHANNEL = LOG_SENSING + 1  # 8
 
     def __init__(self, output_file, log_packets=True, log_queue_drops=True,
                  log_arrivals=True, log_queue_lengths=False, log_states=False):
