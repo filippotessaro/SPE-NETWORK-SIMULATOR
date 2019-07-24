@@ -36,8 +36,8 @@ class Log:
     LOG_NODE_STATE = LOG_QUEUE_SIZE + 1
     # use to log carrier sensing state
     LOG_SENSING = LOG_NODE_STATE + 1
-    #
-    LOG_CORRUPTED_BY_CHANNEL = LOG_SENSING + 1
+    # log the realistic propagation case
+    LOG_CORRUPTED_BY_CHANNEL = LOG_SENSING + 1  # 8
 
     def __init__(self, output_file, log_packets=True, log_queue_drops=True,
                  log_arrivals=True, log_queue_lengths=False, log_states=False):
@@ -120,8 +120,3 @@ class Log:
                                 (self.sim.get_time(), node.get_id(),
                                  node.get_id(), Log.LOG_NODE_STATE, state))
 
-    def log_sensing(self, source, busy):
-        self.log_file.write("%f,%d,%d,%d,%d\n" %
-                            (self.sim.get_time(), source.get_id(),
-                             source.get_id(), Log.LOG_CORRUPTED_BY_CHANNEL,
-                             busy))

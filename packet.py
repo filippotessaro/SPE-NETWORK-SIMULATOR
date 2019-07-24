@@ -29,6 +29,8 @@ class Packet:
     PKT_RECEIVED = 1
     # packet has been corrupted due to, for example, a collision
     PKT_CORRUPTED = 2
+    # in case of realistic propagation, the packet can be corrupted by the channel
+    PKT_CORRUPTED_BY_CHANNEL = 3
 
     def __init__(self, size, duration):
         """
@@ -40,6 +42,7 @@ class Packet:
         self.duration = duration
         self.state = Packet.PKT_RECEIVING
         self.id = Packet.__packets_count
+        self.prob_correct = 1.0
         Packet.__packets_count = Packet.__packets_count + 1
 
     def get_id(self):
@@ -87,4 +90,21 @@ class Packet:
             t = "CORRECTLY RECEIVED"
         elif self.state == Packet.PKT_CORRUPTED:
             t = "CORRUPTED"
+        elif self.state == Packet.PKT_CORRUPTED_BY_CHANNEL:
+            t = "CORRUPTED BY CHANNEL"
         print("Packet state: %s\n\n" % t)
+
+    def getprobcorrect(self):
+        """
+        Return the probability of correct reception
+        :return: prob_correct
+        """
+        return self.prob_correct
+
+    def setprobcorrect(self, new_prob):
+        """
+        Setter of the probability of correct reception
+        :param new_prob:
+        :return:
+        """
+        self.prob_correct = new_prob
