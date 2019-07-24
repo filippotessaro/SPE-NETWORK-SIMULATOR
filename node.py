@@ -15,7 +15,7 @@
 
 import sys
 from module import Module
-from distribution import Distribution,Uniform
+from distribution import Distribution
 from event import Event
 from events import Events
 from packet import Packet
@@ -44,6 +44,7 @@ class Node(Module):
     TX = 1
     RX = 2
     PROC = 3
+    SENSING = 4
 
     def __init__(self, config, channel, x, y):
         """
@@ -81,6 +82,10 @@ class Node(Module):
         # transmit a packet of the maximum size plus a small amount of 10
         # microseconds
         self.timeout_time = self.maxsize * 8.0 / self.datarate + 10e-6
+        # sensing time for trivial carrier sensing
+        self.sensing_time = 50e-6
+        # current packet size
+        self.curr_packet_size = 0
 
     def initialize(self):
         """
@@ -105,6 +110,8 @@ class Node(Module):
             self.handle_end_proc(event)
         elif event.get_type() == Events.RX_TIMEOUT:
             self.handle_rx_timeout(event)
+        elif event.get_type() == Events.SENSING:
+            self.handle_end_sensing(event)
         else:
             print("Node %d has received a notification for event type %d which"
                   " can't be handled", (self.get_id(), event.get_type()))
@@ -127,17 +134,21 @@ class Node(Module):
         """
         # draw packet size from the distribution
         packet_size = self.size.get_value()
+        self.curr_packet_size = packet_size
+
         # log the arrival
         self.logger.log_arrival(self, packet_size)
         if self.state == Node.IDLE:
             # if we are in a idle state, then there must be no packets in the
             # queue
-            assert(len(self.queue) == 0)
+            # assert(len(self.queue) == 0)
             # if current state is IDLE and there are no packets in the queue, we
-            # can start transmitting
-            self.transmit_packet(packet_size)
-            self.state = Node.TX
-            self.logger.log_state(self, Node.TX)
+            # can start sensing the channel
+            # enter in sensing mode
+            self.state = Node.SENSING
+            sensing = Event(self.sim.get_time() + self.sensing_time,
+                            Events.SENSING, self, self)
+            self.sim.schedule_event(sensing)
         else:
             # if we are either transmitting or receiving, packet must be queued
             if self.queue_size == 0 or len(self.queue) < self.queue_size:
@@ -157,43 +168,18 @@ class Node(Module):
         """
         new_packet = event.get_obj()
         if self.state == Node.IDLE:
-            # reception is successful based on probabilistic model
-            mean = new_packet.getprobcorrect()
-            p = Distribution({"distribution": "bernoulli", "mean": mean})
-            if p.get_value() == 1:
-                if self.receiving_count == 0:
-                    # node is idle: it will try to receive this packet
-                    assert (self.current_pkt is None)
-                    new_packet.set_state(Packet.PKT_RECEIVING)
-                    self.current_pkt = new_packet
-                    self.state = Node.RX
-                    assert (self.timeout_event is None)
-                    # create and schedule the RX timeout
-                    self.timeout_event = Event(self.sim.get_time() +
-                                               self.timeout_time, Events.RX_TIMEOUT,
-                                               self, self, None)
-                    self.sim.schedule_event(self.timeout_event)
-                    self.logger.log_state(self, Node.RX)
-                else:
-                    # there is another signal in the air but we are IDLE. this
-                    # happens if we start receiving a frame while transmitting
-                    # another. when we are done with the transmission we assume we
-                    # are not able to detect that there is another frame in the air
-                    # (we are not doing carrier sensing). In this case we assume we
-                    # are not able to detect the new one and set that to corrupted
-                    new_packet.set_state(Packet.PKT_CORRUPTED_BY_CHANNEL)
-            else:
-                # packet corrupted
-                new_packet.set_state(Packet.PKT_CORRUPTED)
+            if self.receiving_count == 0:
+                # node is idle: it will try to receive this packet
+                self.receive_packet(new_packet)
         else:
             # node is either receiving or transmitting
             if self.state == Node.RX and self.current_pkt is not None:
                 # the frame we are currently receiving is corrupted by a
                 # collision, if we have one
-                self.current_pkt.set_state(Packet.PKT_CORRUPTED_BY_CHANNEL)
+                self.current_pkt.set_state(Packet.PKT_CORRUPTED)
             # the same holds for the new incoming packet. either if we are in
             # the RX, TX, or PROC state, we won't be able to decode it
-            new_packet.set_state(Packet.PKT_CORRUPTED_BY_CHANNEL)
+            new_packet.set_state(Packet.PKT_CORRUPTED)
         # in any case, we schedule a new event to handle the end of this frame
         end_rx = Event(self.sim.get_time() + new_packet.get_duration(),
                        Events.END_RX, self, self, new_packet)
@@ -210,8 +196,8 @@ class Node(Module):
         # if the packet that ends is the one that we are trying to receive, but
         # we are not in the RX state, then something is very wrong
         if self.current_pkt is not None and \
-                packet.get_id() == self.current_pkt.get_id():
-            assert (self.state == Node.RX)
+           packet.get_id() == self.current_pkt.get_id():
+            assert(self.state == Node.RX)
         if self.state == Node.RX:
             if packet.get_state() == Packet.PKT_RECEIVING:
                 # the packet is not in a corrupted state: we succesfully
@@ -219,14 +205,14 @@ class Node(Module):
                 packet.set_state(Packet.PKT_RECEIVED)
                 # just to be sure: we can only correctly receive the packet we
                 # were trying to decode
-                assert (packet.get_id() == self.current_pkt.get_id())
+                assert(packet.get_id() == self.current_pkt.get_id())
             # we might be in RX state but have no current packet. this can
             # happen when a packet overlaps with the current one being received
             # and the one being received terminates earlier. we assume to stay
             # in the RX state because we are not able to detect the end of the
             # frame
             if self.current_pkt is not None and \
-                    packet.get_id() == self.current_pkt.get_id():
+               packet.get_id() == self.current_pkt.get_id():
                 self.current_pkt = None
             if self.receiving_count == 1:
                 # this is the only frame currently in the air, move to PROC
@@ -324,3 +310,60 @@ class Node(Module):
         :returns: y position in meters
         """
         return self.y
+
+    def handle_end_sensing(self, event):
+        """
+        handle the end of the trivial carrier sensing
+        :param event:
+        :return:
+        """
+        # check if channel is free before transmitting
+        packet_size = self.curr_packet_size
+        self.state = Node.IDLE
+
+        # boolean in order to check whether someone
+        # is transmitting or not
+        busy = self.check_channel()
+        if not busy:
+            self.transmit_packet(packet_size)
+            self.state = Node.TX
+            self.logger.log_state(self, Node.TX)
+        else:
+            if self.queue_size == 0 or len(self.queue) < self.queue_size:
+                # case: there is space in the queue
+                self.queue.append(packet_size)
+                self.logger.log_queue_length(self, len(self.queue))
+            else:
+                # case: no space left, drop the packet and log it
+                self.logger.log_queue_drop(self, packet_size)
+
+    def check_channel(self):
+        # boolean in order to check whether someone
+        # is transmitting or not
+        busy = False
+        for neighbor in self.channel.neighbors[self.get_id()]:
+            # if some neighbor is transmitting, the channel is busy
+            if neighbor.state == Node.TX:
+                busy = True
+        return busy
+
+    def receive_packet(self, new_packet):
+        """
+        it helps to handle the reception of a packet
+        :param new_packet: incoming packet
+        """
+        assert (self.receiving_count == 0)
+        assert (self.current_pkt is None)
+        # set the state of the new incoming packet
+        new_packet.set_state(Packet.PKT_RECEIVING)
+        self.current_pkt = new_packet
+        self.state = Node.RX
+        # check the timeout
+        assert (self.timeout_event is None)
+        # create and schedule the RX timeout
+        self.timeout_event = Event(self.sim.get_time() +
+                                   self.timeout_time, Events.RX_TIMEOUT,
+                                   self, self, None)
+        self.sim.schedule_event(self.timeout_event)
+        self.logger.log_state(self, Node.RX)
+

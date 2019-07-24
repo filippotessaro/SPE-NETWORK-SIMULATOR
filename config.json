@@ -55,6 +55,6 @@
     [[16.282,11.984], [3.513,1.589], [22.148,8.109], [8.207,9.294], [5.362,19.339], [19.02,4.388], [7.473,19.38], [16.913,22.015], [23.739,6.956], [21.951,17.042]]],
 
 		// log file name using configuration parameters
-		"output" : "aloha-realistic/aloha-realistic_{interarrival.lambda}_{seed}.csv"
+		"output" : "trivial-normal/trivial-normal_{interarrival.lambda}_{seed}.csv"
 	}
 }

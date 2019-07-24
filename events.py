@@ -34,3 +34,5 @@ class Events:
     END_PROC = 5
     # timeout for RX state avoiding getting stuck into RX indefinitely
     RX_TIMEOUT = 6
+    # sensing event for trivial carrier sensing
+    SENSING = 7
