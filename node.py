@@ -139,12 +139,8 @@ class Node(Module):
         # log the arrival
         self.logger.log_arrival(self, packet_size)
         if self.state == Node.IDLE:
-            # if we are in a idle state, then there must be no packets in the
-            # queue
-            # assert(len(self.queue) == 0)
-            # if current state is IDLE and there are no packets in the queue, we
-            # can start sensing the channel
-            # enter in sensing mode
+            # enter in sensing mode and schedule the
+            # event after the sensing time
             self.state = Node.SENSING
             sensing = Event(self.sim.get_time() + self.sensing_time,
                             Events.SENSING, self, self)
@@ -325,12 +321,14 @@ class Node(Module):
         # is transmitting or not
         busy = self.check_channel()
         if not busy:
+            # transmit packet
             self.transmit_packet(packet_size)
             self.state = Node.TX
             self.logger.log_state(self, Node.TX)
         else:
             if self.queue_size == 0 or len(self.queue) < self.queue_size:
-                # case: there is space in the queue
+                # case: there is space in the queue,
+                # the packet is queued
                 self.queue.append(packet_size)
                 self.logger.log_queue_length(self, len(self.queue))
             else:
@@ -338,8 +336,11 @@ class Node(Module):
                 self.logger.log_queue_drop(self, packet_size)
 
     def check_channel(self):
-        # boolean in order to check whether someone
-        # is transmitting or not
+        """
+        boolean in order to check whether someone
+        is transmitting or not
+        :return: boolean
+        """
         busy = False
         for neighbor in self.channel.neighbors[self.get_id()]:
             # if some neighbor is transmitting, the channel is busy
