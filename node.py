@@ -269,13 +269,18 @@ class Node(Module):
             # resuming operations but nothing to transmit. back to IDLE
             self.state = Node.IDLE
             self.logger.log_state(self, Node.IDLE)
-        else:
+        elif self.receiving_count <= 1:
             # there is a packet ready, trasmit it
             packet_size = self.queue.pop(0)
             self.transmit_packet(packet_size)
             self.state = Node.TX
             self.logger.log_state(self, Node.TX)
             self.logger.log_queue_length(self, len(self.queue))
+        else:
+            self.state = Node.SENSING
+            sensing = Event(self.sim.get_time() + self.sensing_time,
+                            Events.SENSING, self, self)
+            self.sim.schedule_event(sensing)
 
     def transmit_packet(self, packet_size):
         """
