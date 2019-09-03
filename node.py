@@ -372,4 +372,3 @@ class Node(Module):
                                    self, self, None)
         self.sim.schedule_event(self.timeout_event)
         self.logger.log_state(self, Node.RX)
-
